@@ -1,3 +1,8 @@
+### Seeking for contributers
+
+I really enjoyed working on this project at first, but I don’t have time to continue right now. If you’d like to contribute, I’d be very grateful. If not, I’m sorry the project is on hold for the time being.
+
+
 <p align="center">
     <img src="docs/icon/icon.png" alt="App Icon" width="100" />
     <br>
