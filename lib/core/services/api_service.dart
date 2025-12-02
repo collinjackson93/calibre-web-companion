@@ -330,7 +330,48 @@ class ApiService {
     } catch (e) {
       _logger.e('Request failed: $e');
       rethrow;
-    }
+    } else {
+      final httpClient = HttpClient();
+      httpClient.autoUncompress = true;
+      httpClient.connectionTimeout = const Duration(seconds: 10);
+
+      if (_allowSelfSigned) {
+        httpClient.badCertificateCallback = (cert, host, port) => true;
+      }
+
+      try {
+        _logger.d('GET (no-redirect) request to: $uri');
+        final request = await httpClient.getUrl(uri);
+        request.followRedirects = false;
+
+        headers.forEach((key, value) {
+          request.headers.set(key, value);
+        });
+
+        final response = await request.close();
+
+        if (response.isRedirect) {
+          final location = response.headers.value('location');
+          if (location != null) {
+            _logger.i('Redirect detected to: $location');
+            throw RedirectException(location);
+          }
+        }
+
+        final responseBody = await response.transform(utf8.decoder).join();
+        final Map<String, String> responseHeaders = {};
+        response.headers.forEach((name, values) {
+          responseHeaders[name] = values.join(', ');
+        });
+
+        return http.Response(
+          responseBody,
+          response.statusCode,
+          headers: responseHeaders,
+        );
+      } finally {
+        httpClient.close();
+      }
   }
 
   /// Parameters:
