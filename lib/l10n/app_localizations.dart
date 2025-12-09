@@ -894,7 +894,7 @@ abstract class AppLocalizations {
   /// No description provided for @noShelvesFound.
   ///
   /// In en, this message translates to:
-  /// **'No shelfs found'**
+  /// **'No shelves found'**
   String get noShelvesFound;
 
   /// No description provided for @bookAddedToShelf.
@@ -930,7 +930,7 @@ abstract class AppLocalizations {
   /// No description provided for @shelfs.
   ///
   /// In en, this message translates to:
-  /// **'Shelfs'**
+  /// **'Shelves'**
   String get shelfs;
 
   /// No description provided for @shelfContains.
@@ -1092,7 +1092,7 @@ abstract class AppLocalizations {
   /// No description provided for @bookInShelfs.
   ///
   /// In en, this message translates to:
-  /// **'Book in {count, plural, =1{one shelf} other{{count} shelfs}}'**
+  /// **'Book in {count, plural, =1{one shelf} other{{count} shelves}}'**
   String bookInShelfs(num count);
 
   /// No description provided for @searchForBooks.
@@ -1110,7 +1110,7 @@ abstract class AppLocalizations {
   /// No description provided for @costumHttpPHeader.
   ///
   /// In en, this message translates to:
-  /// **'Costum HTTP-Header'**
+  /// **'Custom HTTP-Header'**
   String get costumHttpPHeader;
 
   /// No description provided for @addHeader.
@@ -1128,13 +1128,13 @@ abstract class AppLocalizations {
   /// No description provided for @addACostumHttpHeaderThatWillBeSentWithEveryRequest.
   ///
   /// In en, this message translates to:
-  /// **'Add a costum HTTP-Header that will be sent with every request'**
+  /// **'Add a custom HTTP-Header that will be sent with every request'**
   String get addACostumHttpHeaderThatWillBeSentWithEveryRequest;
 
   /// No description provided for @noCostumHttpHeadersYet.
   ///
   /// In en, this message translates to:
-  /// **'No costum HTTP-Header yet'**
+  /// **'No custom HTTP-Header yet'**
   String get noCostumHttpHeadersYet;
 
   /// No description provided for @header.
@@ -1994,6 +1994,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Allow unsafe connections'**
   String get allowUnsafeConnections;
+
+  /// No description provided for @ok.
+  ///
+  /// In en, this message translates to:
+  /// **'Ok'**
+  String get ok;
+
+  /// No description provided for @attentionSSLCertificate.
+  ///
+  /// In en, this message translates to:
+  /// **'Attention: Self-signed certificates can be insecure. Use them only if you understand the risks.'**
+  String get attentionSSLCertificate;
+
+  /// No description provided for @ssoLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'SSO-Login'**
+  String get ssoLogin;
+
+  /// No description provided for @pleaseLoginWithYourSSOAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Please login with your SSO account. You will be redirected back to the app after successful login.'**
+  String get pleaseLoginWithYourSSOAccount;
+
+  /// No description provided for @loginWithSSO.
+  ///
+  /// In en, this message translates to:
+  /// **'Login with SSO'**
+  String get loginWithSSO;
+
+  /// No description provided for @pleaseEnterSSOUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter the SSO URL'**
+  String get pleaseEnterSSOUrl;
+
+  /// No description provided for @openInInternalReader.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in Internal Reader'**
+  String get openInInternalReader;
+
+  /// No description provided for @errorOpeningBookInInternalReader.
+  ///
+  /// In en, this message translates to:
+  /// **'Error opening book in internal reader'**
+  String get errorOpeningBookInInternalReader;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

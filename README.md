@@ -6,7 +6,7 @@ I really enjoyed working on this project at first, but I don’t have time to co
 <p align="center">
     <img src="docs/icon/icon.png" alt="App Icon" width="100" />
     <br>
-    v1.7.0
+    v1.7.2
 </p>
 
 <p align="center">

@@ -24,8 +24,13 @@ class DiscoverDetailsRemoteDatasource {
       final String path = _getBookListPath(type, subPath);
       final jsonData = await apiService.getXmlAsJson(
         endpoint: path,
-        authMethod: AuthMethod.basic,
+        authMethod: AuthMethod.auto,
       );
+
+      if (jsonData['feed'] == null || jsonData['feed']['entry'] == null) {
+        logger.i('No entries found in feed for path: $path');
+        return const DiscoverFeedModel(books: [], nextPageUrl: null);
+      }
 
       final dynamic entryData = jsonData['feed']["entry"];
       final List<dynamic> items = entryData is List ? entryData : [entryData];
@@ -57,8 +62,13 @@ class DiscoverDetailsRemoteDatasource {
       final String path = _getCategoryPath(type, subPath);
       final jsonData = await apiService.getXmlAsJson(
         endpoint: path,
-        authMethod: AuthMethod.basic,
+        authMethod: AuthMethod.auto,
       );
+
+      if (jsonData['feed'] == null || jsonData['feed']['entry'] == null) {
+        logger.i('No entries found in feed for path: $path');
+        return const CategoryFeed(categories: [], nextPageUrl: null);
+      }
 
       final dynamic entryData = jsonData['feed']["entry"];
       final List<dynamic> items = entryData is List ? entryData : [entryData];
@@ -79,8 +89,13 @@ class DiscoverDetailsRemoteDatasource {
     try {
       final jsonData = await apiService.getXmlAsJson(
         endpoint: fullPath,
-        authMethod: AuthMethod.basic,
+        authMethod: AuthMethod.auto,
       );
+
+      if (jsonData['feed'] == null || jsonData['feed']['entry'] == null) {
+        logger.i('No entries found in feed for path: $fullPath');
+        return const DiscoverFeedModel(books: [], nextPageUrl: null);
+      }
 
       final dynamic entryData = jsonData['feed']["entry"];
       final List<dynamic> items = entryData is List ? entryData : [entryData];

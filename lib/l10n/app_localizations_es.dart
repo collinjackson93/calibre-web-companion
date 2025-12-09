@@ -977,4 +977,28 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get allowUnsafeConnections => 'Permitir conexiones inseguras';
+
+  @override
+  String get ok => 'Ok';
+
+  @override
+  String get attentionSSLCertificate => 'Atención: Los certificados autofirmados pueden ser inseguros. Úsalos solo si entiendes los riesgos.';
+
+  @override
+  String get ssoLogin => 'SSO-Iniciar sesión';
+
+  @override
+  String get pleaseLoginWithYourSSOAccount => 'Por favor, inicia sesión con tu cuenta SSO. Serás redirigido de vuelta a la aplicación después de iniciar sesión correctamente.';
+
+  @override
+  String get loginWithSSO => 'Iniciar sesión con SSO';
+
+  @override
+  String get pleaseEnterSSOUrl => 'Por favor, introduce la URL de SSO';
+
+  @override
+  String get openInInternalReader => 'Abrir en lector interno';
+
+  @override
+  String get errorOpeningBookInInternalReader => 'Error al abrir el libro en el lector interno';
 }

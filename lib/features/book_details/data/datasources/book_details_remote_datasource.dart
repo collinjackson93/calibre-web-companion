@@ -8,6 +8,7 @@ import 'package:http_parser/http_parser.dart';
 import 'package:logger/logger.dart';
 import 'package:open_file/open_file.dart';
 import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:calibre_web_companion/core/services/api_service.dart';
@@ -38,7 +39,7 @@ class BookDetailsRemoteDatasource {
 
       final response = await apiService.getJson(
         endpoint: '/ajax/book/$bookUuid',
-        authMethod: AuthMethod.basic,
+        authMethod: AuthMethod.auto,
       );
 
       return BookDetailsModel.fromBookListModel(
@@ -60,7 +61,6 @@ class BookDetailsRemoteDatasource {
         endpoint: '/ajax/toggleread/$bookId',
         authMethod: AuthMethod.cookie,
         useCsrf: true,
-        contentType: 'application/x-www-form-urlencoded',
       );
 
       if (response.statusCode == 200) {
@@ -86,7 +86,6 @@ class BookDetailsRemoteDatasource {
         endpoint: '/ajax/togglearchived/$bookId',
         authMethod: AuthMethod.cookie,
         useCsrf: true,
-        contentType: 'application/x-www-form-urlencoded',
       );
 
       if (response.statusCode == 200) {
@@ -263,12 +262,10 @@ class BookDetailsRemoteDatasource {
       logger.i(
         'Downloading book: ${book.title}, Format: $format, Schema: $schema, Directory: $selectedDirectory',
       );
-      // Create safe filename
       final safeTitle = book.title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
       final safeAuthor = book.authors.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
       final fileName = '$safeTitle.$format';
 
-      // Determine folder structure based on schema
       DocumentFile targetDir = selectedDirectory;
       String? safeSeries;
 
@@ -278,7 +275,6 @@ class BookDetailsRemoteDatasource {
 
       switch (schema) {
         case DownloadSchema.flat:
-          // nothing to add
           break;
         case DownloadSchema.authorOnly:
           targetDir = await _getOrCreateDirectory(
@@ -317,7 +313,6 @@ class BookDetailsRemoteDatasource {
         return existingFile.uri.toString();
       }
 
-      // Get download stream
       final response = await getDownloadStream(book.id.toString(), format);
       final contentLength = response.contentLength ?? -1;
 
@@ -325,7 +320,6 @@ class BookDetailsRemoteDatasource {
         'Download response status: ${response.statusCode}, Content length: $contentLength',
       );
 
-      // Collect all bytes from stream
       final List<int> bytes = [];
       int receivedBytes = 0;
 
@@ -341,7 +335,6 @@ class BookDetailsRemoteDatasource {
 
       final Uint8List fileData = Uint8List.fromList(bytes);
 
-      // Write file using DocMan SAF
       final createdFile = await targetDir.createFile(
         name: fileName,
         bytes: fileData,
@@ -526,13 +519,54 @@ class BookDetailsRemoteDatasource {
     String format = 'epub',
     Function(int)? progressCallback,
   }) async {
-    return await downloadBook(
-      book,
-      selectedDirectory,
-      schema,
-      format: format,
-      progressCallback: progressCallback,
-    );
+    try {
+      logger.i('Preparing book for internal reader: ${book.title}');
+
+      if (book.formats.isNotEmpty) {
+        format = book.formats.first.toLowerCase();
+      }
+
+      final safFileUri = await downloadBookToPath(
+        book: book,
+        selectedDirectory: selectedDirectory,
+        schema: schema,
+        format: format,
+        progressCallback: progressCallback,
+      );
+
+      DocumentFile? safFile =
+          safFileUri.isNotEmpty ? await DocumentFile.fromUri(safFileUri) : null;
+
+      if (safFile == null || !safFile.isFile) {
+        logger.e('Downloaded file is not a valid file: $safFileUri');
+        throw Exception('Downloaded file is not a valid file: $safFileUri');
+      }
+
+      final bytes = await safFile.read();
+      if (bytes == null) {
+        logger.e('Could not read bytes from SAF file.');
+        throw Exception('Could not read bytes from SAF file.');
+      }
+
+      final tempDir = await getTemporaryDirectory();
+      final safeFileName = safFile.name.replaceAll(
+        RegExp(r'[^a-zA-Z0-9.\-_]'),
+        '_',
+      );
+      final localFile = File('${tempDir.path}/$safeFileName');
+      await localFile.writeAsBytes(bytes, flush: true);
+
+      if (!await localFile.exists()) {
+        logger.e('Failed to create local cache file at ${localFile.path}');
+        throw Exception('Failed to create local cache file.');
+      }
+
+      logger.i('File prepared for reader at: ${localFile.path}');
+      return localFile.path;
+    } catch (e) {
+      logger.e('Error preparing book for reader: $e');
+      throw Exception('Error preparing book for reader: $e');
+    }
   }
 
   Future<bool> uploadToSend2Ereader(

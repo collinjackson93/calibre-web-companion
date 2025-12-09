@@ -7,20 +7,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xml2json/xml2json.dart';
 import 'package:html/parser.dart' as parser;
 import 'package:http_parser/http_parser.dart' show MediaType;
+import 'package:http/io_client.dart';
+import 'package:calibre_web_companion/core/exceptions/redirect_exception.dart';
 
 import 'package:calibre_web_companion/features/book_view/data/datasources/book_view_remote_datasource.dart';
 
-/// Authentication methods supported by the API
-enum AuthMethod { none, cookie, basic }
+enum AuthMethod { none, cookie, basic, auto }
 
 class ApiService {
   final Logger _logger = Logger();
-  final http.Client _client = http.Client();
+  HttpClient? _httpClient;
+  http.Client? _client;
   String? _baseUrl;
   String? _cookie;
   String? _username;
   String? _password;
   String? _basePath;
+
+  bool _allowSelfSigned = false;
 
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
@@ -45,7 +49,7 @@ class ApiService {
 
       final fullUrl = basePath.isEmpty ? _baseUrl : '$_baseUrl/$basePath';
 
-      _logger.d('Base URL with path: $fullUrl');
+      // _logger.d('Base URL with path: $fullUrl');
       return fullUrl!;
     }
   }
@@ -80,6 +84,15 @@ class ApiService {
     _username = prefs.getString('username');
     _password = prefs.getString('password');
     _basePath = prefs.getString('base_path') ?? '';
+    _allowSelfSigned = prefs.getBool('allow_self_signed') ?? false;
+
+    _httpClient = HttpClient();
+    if (_allowSelfSigned) {
+      _logger.w('Allowing self-signed certificates.');
+      _httpClient!.badCertificateCallback = (cert, host, port) => true;
+    }
+    _client?.close();
+    _client = IOClient(_httpClient!);
   }
 
   void dispose() {
@@ -281,20 +294,23 @@ class ApiService {
   /// - `endpoint`: The API endpoint to request
   /// - `authMethod`: The authentication method to use
   /// - `queryParams`: Optional query parameters
+  /// - `followRedirects`: If false, will throw a [RedirectException] on 301/302 status codes.
   Future<http.Response> get({
     String endpoint = '',
     AuthMethod authMethod = AuthMethod.basic,
     Map<String, String> queryParams = const {},
+    bool followRedirects = true,
   }) async {
     await _ensureInitialized();
     final uri = _buildUri(endpoint: endpoint, queryParams: queryParams);
-    final headers = _getAuthHeaders(authMethod: authMethod);
+    final headers = getAuthHeaders(authMethod: authMethod);
 
     final customHeaders = await _processCustomHeaders();
     headers.addAll(customHeaders);
 
-    _logger.d('GET request to: $uri');
-    _logger.d('Headers: $headers');
+    if (followRedirects) {
+      _logger.d('GET request to: $uri');
+      _logger.d('Headers: $headers');
 
     try {
       final response = await _client.get(uri, headers: headers);
@@ -314,7 +330,48 @@ class ApiService {
     } catch (e) {
       _logger.e('Request failed: $e');
       rethrow;
-    }
+    } else {
+      final httpClient = HttpClient();
+      httpClient.autoUncompress = true;
+      httpClient.connectionTimeout = const Duration(seconds: 10);
+
+      if (_allowSelfSigned) {
+        httpClient.badCertificateCallback = (cert, host, port) => true;
+      }
+
+      try {
+        _logger.d('GET (no-redirect) request to: $uri');
+        final request = await httpClient.getUrl(uri);
+        request.followRedirects = false;
+
+        headers.forEach((key, value) {
+          request.headers.set(key, value);
+        });
+
+        final response = await request.close();
+
+        if (response.isRedirect) {
+          final location = response.headers.value('location');
+          if (location != null) {
+            _logger.i('Redirect detected to: $location');
+            throw RedirectException(location);
+          }
+        }
+
+        final responseBody = await response.transform(utf8.decoder).join();
+        final Map<String, String> responseHeaders = {};
+        response.headers.forEach((name, values) {
+          responseHeaders[name] = values.join(', ');
+        });
+
+        return http.Response(
+          responseBody,
+          response.statusCode,
+          headers: responseHeaders,
+        );
+      } finally {
+        httpClient.close();
+      }
   }
 
   /// Parameters:
@@ -327,6 +384,7 @@ class ApiService {
   /// - `useCsrf`: Whether to fetch and include CSRF token
   /// - `csrfSelector`: CSS selector for the CSRF token input field
   /// - `files`: Optional list of files to upload as multipart/form-data
+  /// - `followRedirects`: If false, will throw a [RedirectException] on 301/302 status codes.
   Future<http.Response> post({
     String endpoint = '',
     AuthMethod authMethod = AuthMethod.basic,
@@ -336,16 +394,69 @@ class ApiService {
     bool useCsrf = false,
     String csrfSelector = 'input[name="csrf_token"]',
     List<http.MultipartFile>? files,
+    bool followRedirects = true,
   }) async {
     await _ensureInitialized();
     final uri = _buildUri(endpoint: endpoint, queryParams: queryParams);
+
+    if (!followRedirects) {
+      final httpClient = HttpClient();
+      if (_allowSelfSigned) {
+        httpClient.badCertificateCallback = (cert, host, port) => true;
+      }
+      httpClient.connectionTimeout = const Duration(seconds: 10);
+
+      try {
+        _logger.d('POST (no-redirect) request to: $uri');
+        final request = await httpClient.postUrl(uri);
+        request.followRedirects = false;
+
+        final headers = getAuthHeaders(authMethod: authMethod);
+        headers['Content-Type'] = contentType;
+        final customHeaders = await _processCustomHeaders();
+        headers.addAll(customHeaders);
+
+        headers.forEach((key, value) {
+          request.headers.set(key, value);
+        });
+
+        if (body != null) {
+          final encodedBody = _encodeBody(body: body, contentType: contentType);
+          request.write(encodedBody);
+        }
+
+        final response = await request.close();
+
+        if (response.isRedirect) {
+          final location = response.headers.value('location');
+          if (location != null) {
+            _logger.i('Redirect detected to: $location');
+            throw RedirectException(location);
+          }
+        }
+
+        final responseBody = await response.transform(utf8.decoder).join();
+        final Map<String, String> responseHeaders = {};
+        response.headers.forEach((name, values) {
+          responseHeaders[name] = values.join(', ');
+        });
+
+        return http.Response(
+          responseBody,
+          response.statusCode,
+          headers: responseHeaders,
+        );
+      } finally {
+        httpClient.close();
+      }
+    }
 
     final customHeaders = await _processCustomHeaders();
 
     if (useCsrf) {
       _logger.i('Making CSRF-protected POST request to: $uri');
 
-      final getHeaders = _getAuthHeaders(authMethod: authMethod);
+      final getHeaders = getAuthHeaders(authMethod: authMethod);
       getHeaders.addAll(customHeaders);
       getHeaders['Accept'] = 'text/html,application/xhtml+xml,application/xml';
 
@@ -434,6 +545,8 @@ class ApiService {
         sessionCookie = _mergeCookieHeaders(sessionCookie, newCookie);
       }
 
+      final combinedCookieHeader = cookies.join('; ');
+
       if (files != null && files.isNotEmpty) {
         final request = http.MultipartRequest('POST', uri);
 
@@ -443,6 +556,7 @@ class ApiService {
         request.headers['Referer'] = uri.toString();
         request.headers['Origin'] =
             '${uri.scheme}://${uri.host}${uri.port != 80 && uri.port != 443 ? ":${uri.port}" : ""}';
+        request.headers['Connection'] = 'close';
 
         request.headers.addAll(customHeaders);
 
@@ -518,7 +632,7 @@ class ApiService {
         _logger.d('CSRF-protected POST body: $encodedBody');
 
         try {
-          final response = await _client.post(
+          final response = await _client!.post(
             uri,
             headers: postHeaders,
             body: encodedBody,
@@ -546,7 +660,7 @@ class ApiService {
       if (files != null && files.isNotEmpty) {
         final request = http.MultipartRequest('POST', uri);
 
-        final headers = _getAuthHeaders(authMethod: authMethod);
+        final headers = getAuthHeaders(authMethod: authMethod);
         headers.addAll(customHeaders);
         request.headers.addAll(headers);
 
@@ -582,7 +696,7 @@ class ApiService {
           rethrow;
         }
       } else {
-        final headers = _getAuthHeaders(authMethod: authMethod);
+        final headers = getAuthHeaders(authMethod: authMethod);
         headers['Content-Type'] = contentType;
         headers.addAll(customHeaders);
 
@@ -592,7 +706,7 @@ class ApiService {
         final encodedBody = _encodeBody(body: body, contentType: contentType);
 
         try {
-          final response = await _client.post(
+          final response = await _client!.post(
             uri,
             headers: headers,
             body: encodedBody ?? "",
@@ -633,7 +747,7 @@ class ApiService {
     final uri = _buildUri(endpoint: endpoint, queryParams: queryParams);
 
     final request = http.Request('GET', uri);
-    final headers = _getAuthHeaders(authMethod: authMethod);
+    final headers = getAuthHeaders(authMethod: authMethod);
 
     final customHeaders = await _processCustomHeaders();
     headers.addAll(customHeaders);
@@ -644,7 +758,7 @@ class ApiService {
     _logger.d('Headers: $headers');
 
     try {
-      final response = await _client.send(request);
+      final response = await _client!.send(request);
       _logger.i('Stream response status: ${response.statusCode}');
       _checkResponseStatus(statusCode: response.statusCode);
       return response;
@@ -773,8 +887,8 @@ class ApiService {
   /// Parameters:
   ///
   /// - `authMethod`: The authentication method to use
-  Map<String, String> _getAuthHeaders({
-    AuthMethod authMethod = AuthMethod.basic,
+  Map<String, String> getAuthHeaders({
+    AuthMethod authMethod = AuthMethod.auto,
   }) {
     Map<String, String> headers = {};
 

@@ -6,24 +6,30 @@ import 'package:calibre_web_companion/features/discover_details/data/models/disc
 import 'package:calibre_web_companion/core/services/api_service.dart';
 
 class BookCard extends StatelessWidget {
-  final DiscoverDetailsModel book;
+  final String bookId;
+  final String title;
+  final String authors;
   final VoidCallback? onTap;
   final bool isLoading;
 
   const BookCard({
     super.key,
-    required this.book,
+    required this.bookId,
+    required this.title,
+    required this.authors,
     this.onTap,
     this.isLoading = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final borderRadius = BorderRadius.circular(12);
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: borderRadius),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: borderRadius,
         onTap: isLoading ? null : onTap,
         child: Stack(
           children: [
@@ -52,35 +58,44 @@ class BookCard extends StatelessWidget {
                                   final api = ApiService();
                                   final headers = <String, String>{};
                                   final cookie = await api.getCookieHeader();
-                                  if (cookie != null && cookie.trim().isNotEmpty) {
+                                  if (cookie != null &&
+                                      cookie.trim().isNotEmpty) {
                                     headers['Cookie'] = cookie;
                                   }
-                                  final custom = await api.getProcessedCustomHeaders();
+                                  final custom =
+                                      await api.getProcessedCustomHeaders();
                                   headers.addAll(custom);
                                   final username = api.getUsername();
                                   final password = api.getPassword();
-                                  if (username.isNotEmpty && password.isNotEmpty) {
+                                  if (username.isNotEmpty &&
+                                      password.isNotEmpty) {
                                     headers['Authorization'] =
                                         'Basic ${base64.encode(utf8.encode('$username:$password'))}';
                                   }
-                                  headers['Accept'] = 'image/avif;q=0,image/webp;q=0,image/jpeg,image/png,*/*;q=0.5';
+                                  headers['Accept'] =
+                                      'image/avif;q=0,image/webp;q=0,image/jpeg,image/png,*/*;q=0.5';
                                   headers['Cache-Control'] = 'no-transform';
                                   return headers;
                                 }(),
                                 builder: (context, snapshot) {
-                                  final headers = snapshot.data ?? const <String, String>{};
+                                  final headers =
+                                      snapshot.data ?? const <String, String>{};
                                   return CachedNetworkImage(
                                     imageUrl: book.coverUrl!,
                                     httpHeaders: headers,
                                     fit: BoxFit.cover,
-                                    errorWidget: (context, error, stackTrace) =>
-                                        Image.network(
-                                          book.coverUrl!,
-                                          headers: headers,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stack) =>
-                                              _buildPlaceholder(context),
-                                        ),
+                                    errorWidget:
+                                        (context, error, stackTrace) =>
+                                            Image.network(
+                                              book.coverUrl!,
+                                              headers: headers,
+                                              fit: BoxFit.cover,
+                                              errorBuilder:
+                                                  (context, error, stack) =>
+                                                      _buildPlaceholder(
+                                                        context,
+                                                      ),
+                                            ),
                                   );
                                 },
                               ),
@@ -94,9 +109,10 @@ class BookCard extends StatelessWidget {
                     padding: const EdgeInsets.all(8.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          book.title,
+                          title,
                           style: Theme.of(context).textTheme.titleSmall
                               ?.copyWith(fontWeight: FontWeight.bold),
                           maxLines: 2,
@@ -104,7 +120,7 @@ class BookCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          book.author,
+                          authors,
                           style: Theme.of(
                             context,
                           ).textTheme.bodySmall?.copyWith(
@@ -121,36 +137,22 @@ class BookCard extends StatelessWidget {
                 ),
               ],
             ),
-
             if (isLoading)
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
                     color: Theme.of(
                       context,
-                    ).colorScheme.secondaryContainer.withValues(alpha: .6),
-                    borderRadius: BorderRadius.circular(12),
+                    ).colorScheme.surface.withValues(alpha: .6),
+                    borderRadius: borderRadius,
                   ),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: Theme.of(context).colorScheme.secondaryContainer,
-                      strokeWidth: 3,
-                    ),
+                  child: const Center(
+                    child: CircularProgressIndicator(strokeWidth: 3),
                   ),
                 ),
               ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildPlaceholder(BuildContext context) {
-    return Center(
-      child: Icon(
-        Icons.book,
-        size: 48,
-        color: Theme.of(context).colorScheme.primary.withValues(alpha: .5),
       ),
     );
   }
